@@ -1,5 +1,5 @@
 [tool.uv.workspace]
-members = ["python"]
+members = ["python/*"]
 
 [dependency-groups]
 dev = [
@@ -25,7 +25,6 @@ disable = [
 
 [tool.ruff]
 target-version = "py312"
-src = ["src"]
 line-length = 115
 
 [tool.ruff.lint]

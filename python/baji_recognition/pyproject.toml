@@ -1,7 +1,6 @@
 [project]
 name = "baji_recognition"
 description = "Identify whether regular or low Baji is speaking"
-readme = "README.md"
 license = "MIT"
 requires-python = "==3.12.*"
 dependencies = [
