@@ -1,11 +1,29 @@
-/target
-.env
-*.egg-info
-.ruff_cache
+# VSCode
+.vscode/*
+!.vscode/extensions.json
+
+# Jetbrains
 .idea/*
-*__pycache__*
+
+# Environments
 .venv
+
+# Caches
+.env
 .mypy_cache
+.ruff_cache
+
+# Python
+__pycache__/
+*.egg-info/
+*.egg
+*.pkl
+
+# CMake
+cmake-build-*/
+
+# Misc
+target/
 *.zip
 .idea
 cpp_impl/.idea

@@ -1,6 +1,5 @@
-[build-system]
-requires = ["setuptools>=78", "wheel>=0.41"]
-build-backend = "setuptools.build_meta"
+[tool.uv.workspace]
+members = ["python/*"]
 
 [dependency-groups]
 dev = [
@@ -12,37 +11,6 @@ dev = [
 type-check = ["mypy", "types-pyaudio"]
 lint = ["ruff", "pylint"]
 test = ["pytest", "pytest-cov", "pytest-xdist", "pytest-unused-fixtures"]
-
-[project]
-name = "baji_recognition"
-description = "Identify whether regular or low Baji is speaking"
-readme = "README.md"
-requires-python = "==3.12.*"
-dependencies = [
-    "librosa>=0.11.0",
-    "numpy>=2.4.3",
-    "pyannote-audio>=4.0.4",
-    "pyaudio>=0.2.14",
-    "python-dotenv>=1.2.2",
-    "matplotlib",
-    "moviepy>=2.0"
-]
-dynamic= ["version"]
-
-[project.license]
-text="TBD"
-
-# Uncomment to add script entry points
-[project.scripts]
-detect_speaker = "baji_recognition.identifier:main"
-quick_vis = "baji_recognition.scripts:quick_vis"
-vis = "baji_recognition.scripts:visualize"
-
-# [tools.setuptools.package-data]
-# baji_recognition = ["some_files"]
-
-[tool.setuptools.dynamic]
-version = { attr = "baji_recognition.__version__"}
 
 [tool.bandit]
 assert_used = { skips = ["**/test_*.py"] }
@@ -57,36 +25,35 @@ disable = [
 
 [tool.ruff]
 target-version = "py312"
-src = ["src"]
 line-length = 115
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "ANN",      # I don't like these
-    "COM812",   # recommended to ignore by formatter
-    "ISC001",   # recommended to ignore by formatter
-    "E501",     # ruff format handles line length
-    "D100",     # Don't plan on including module-level docstrings
-    "D102",     # Don't plan on including module-level docstrings
-    "D103",     # Don't plan on including module-level docstrings
-    "D203",     # Incompatible with D211 and ruff format
-    "D213",     # Incompatible with D212
-    "D400",     # I don't care for this docstring formatting nitpick
-    "D415",     # I don't care for this docstring formatting nitpick
-    "FBT002",    # Disagree
-    "T201",    # Disagree
+    "ANN",    # I don't like these
+    "COM812", # recommended to ignore by formatter
+    "ISC001", # recommended to ignore by formatter
+    "E501",   # ruff format handles line length
+    "D100",   # Don't plan on including module-level docstrings
+    "D102",   # Don't plan on including module-level docstrings
+    "D103",   # Don't plan on including module-level docstrings
+    "D203",   # Incompatible with D211 and ruff format
+    "D213",   # Incompatible with D212
+    "D400",   # I don't care for this docstring formatting nitpick
+    "D415",   # I don't care for this docstring formatting nitpick
+    "FBT002", # Disagree
+    "T201",   # Disagree
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
 "tests/**/*.py" = [
-    "S101", # asserts allowed in tests...
-    "ARG", # Unused function args -> fixtures nevertheless are functionally relevant...
-    "FBT", # Don't care about booleans as positional arguments in tests, e.g. via @pytest.mark.parametrize()
+    "S101",    # asserts allowed in tests...
+    "ARG",     # Unused function args -> fixtures nevertheless are functionally relevant...
+    "FBT",     # Don't care about booleans as positional arguments in tests, e.g. via @pytest.mark.parametrize()
     "PLR2004", # Magic value used in comparison, ...
-    "S311", # Standard pseudo-random generators are not suitable for cryptographic purposes
-    "D103", # I don't like docstrings *that* much
-    "INP001", # tests don't need to be a module
+    "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
+    "D103",    # I don't like docstrings *that* much
+    "INP001",  # tests don't need to be a module
 ]
 [tool.ruff.lint.pylint]
 max-args = 6
@@ -104,7 +71,7 @@ files = ["."]
 exclude = ["build/"]
 strict = true
 explicit_package_bases = true
-mypy_path = ["src"]
+mypy_path = ["python/src"]
 
 # add modules that don't have stubs (but those can be added for some imports)
 [[tool.mypy.overrides]]

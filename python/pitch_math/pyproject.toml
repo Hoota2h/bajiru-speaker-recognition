@@ -1,0 +1,33 @@
+[project]
+name = "pitch_math"
+version = "0.1.0"
+description = "Identify whether regular or low Baji is speaking"
+license = "MIT"
+requires-python = "==3.12.*"
+dependencies = [
+    "librosa>=0.11.0",
+    "praat-parselmouth>=0.4.7",
+    "silero-vad>=6.2.1",
+    "sounddevice>=0.5.5",
+    "textual>=0.70",
+]
+
+[project.scripts]
+pitch-train = "pitch_math.scripts.train:main"
+pitch-test = "pitch_math.scripts.test_audio:main"
+pitch-live = "pitch_math.scripts.live:main"
+pitch-debug = "pitch_math.scripts.debug:main"
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["S110", "BLE001", "PLR2004"]
+
+[tool.ruff.lint.pylint]
+max-args = 10

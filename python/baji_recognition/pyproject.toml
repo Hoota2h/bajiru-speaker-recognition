@@ -1,0 +1,31 @@
+[project]
+name = "baji_recognition"
+description = "Identify whether regular or low Baji is speaking"
+license = "MIT"
+requires-python = "==3.12.*"
+dependencies = [
+    "librosa>=0.11.0",
+    "numpy>=2.4.3",
+    "pyannote-audio>=4.0.4",
+    "pyaudio>=0.2.14",
+    "python-dotenv>=1.2.2",
+    "matplotlib",
+    "moviepy>=2.0",
+]
+dynamic = ["version"]
+
+# Uncomment to add script entry points
+[project.scripts]
+detect_speaker = "baji_recognition.identifier:main"
+quick_vis = "baji_recognition.scripts:quick_vis"
+vis = "baji_recognition.scripts:visualize"
+
+# [tools.setuptools.package-data]
+# baji_recognition = ["some_files"]
+
+[build-system]
+requires = ["setuptools>=78", "wheel>=0.41"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { attr = "baji_recognition.__version__" }
