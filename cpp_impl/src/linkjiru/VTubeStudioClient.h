@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Constants.h"
 #include <string>
 #include <atomic>
 #include <memory>
@@ -17,7 +18,8 @@ public:
     VTubeStudioClient(const VTubeStudioClient&)            = delete;
     VTubeStudioClient& operator=(const VTubeStudioClient&) = delete;
 
-    bool connect(const std::string& host = "localhost", const std::string& port = "8001");
+    bool connect(const std::string& host = linkjiru::defaultVtsHost,
+                 const std::string& port = linkjiru::defaultVtsPort);
 
     void disconnect();
     bool isConnected() const { return connected.load(); }
@@ -36,10 +38,15 @@ private:
     std::mutex sendMutex;
     std::atomic<bool> connected{false};
 
-    static constexpr const char* PLUGIN_NAME    = "Linkjiru";
-    static constexpr const char* DEVELOPER_NAME = "tomobaji";
-    static constexpr int OP_TIMEOUT_MS          = 2000;
-    static constexpr int AUTH_POPUP_TIMEOUT_MS  = 60000;
+    /* Timeout for all normal WS ops — connect, handshake,
+       close, API round-trips (ms).  If localhost takes
+       longer than 3 s, VTS isn't running.
+       I changed all the ops to this, so its standardized*/
+    static constexpr int OP_TIMEOUT_MS = 3000;
+
+    /* Timeout for the auth popup (ms).  The user has to
+       click "Allow" in VTS, so this needs to be long. */
+    static constexpr int AUTH_POPUP_TIMEOUT_MS = 60000;
 
     static std::string getTokenFilePath();
     static bool loadToken(std::string& token);

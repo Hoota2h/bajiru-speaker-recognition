@@ -10,6 +10,8 @@
 #include <boost/asio/steady_timer.hpp>
 #include <nlohmann/json.hpp>
 
+#include "Constants.h"
+
 #include <atomic>
 #include <string>
 #include <thread>
@@ -19,14 +21,13 @@
    hellscape I refuse to drag into test code. */
 class MockVtsServer
 {
-    using beast_ws   = boost::beast::websocket::stream<boost::beast::tcp_stream>;
-    using tcp        = boost::asio::ip::tcp;
-    using json       = nlohmann::json;
-    using flat_buf   = boost::beast::flat_buffer;
+    using beast_ws = boost::beast::websocket::stream<boost::beast::tcp_stream>;
+    using tcp      = boost::asio::ip::tcp;
+    using json     = nlohmann::json;
+    using flat_buf = boost::beast::flat_buffer;
 
 public:
-    explicit MockVtsServer(const unsigned short port = 0)
-        : acceptor(ioc, tcp::endpoint(tcp::v4(), port))
+    explicit MockVtsServer(const unsigned short port = 0) : acceptor(ioc, tcp::endpoint(tcp::v4(), port))
     {
         actualPort = acceptor.local_endpoint().port();
     }
@@ -42,10 +43,12 @@ public:
 
     void stop()
     {
-        running.store(false);
-
+        // Close acceptor first so the poll loop wakes immediately
+        // instead of sleeping for another pollIntervalMs.
         boost::system::error_code ec;
         acceptor.close(ec);
+
+        running.store(false);
 
         if (serverThread.joinable())
         {
@@ -56,6 +59,13 @@ public:
     int getInjectCount() const { return injectCount.load(); }
 
 private:
+    static constexpr int pollIntervalMs = 50;  // non-blocking accept poll (ms)
+    static constexpr int wsTimeoutMs    = 500; // WS read/write timeout (ms)
+
+    /* Fake auth token.  The client encrypts it with DPAPI,
+       so the value itself is irrelevant. */
+    static constexpr const char* mockAuthToken = "mock-test-token";
+
     boost::asio::io_context ioc;
     tcp::acceptor acceptor;
     unsigned short actualPort = 0;
@@ -85,10 +95,9 @@ private:
                         break;
                     }
 
-                    if (ec == boost::asio::error::would_block ||
-                        ec == boost::asio::error::try_again)
+                    if (ec == boost::asio::error::would_block || ec == boost::asio::error::try_again)
                     {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                        std::this_thread::sleep_for(std::chrono::milliseconds(pollIntervalMs));
                         continue;
                     }
 
@@ -105,7 +114,7 @@ private:
                 ws.accept();
 
                 // Timeout so we can actually shut down. Beast has no cancellation token.
-                boost::beast::get_lowest_layer(ws).expires_after(std::chrono::milliseconds(500));
+                boost::beast::get_lowest_layer(ws).expires_after(std::chrono::milliseconds(wsTimeoutMs));
 
                 while (running.load())
                 {
@@ -116,7 +125,7 @@ private:
                     if (readEc == boost::beast::error::timeout)
                     {
                         // Timed out, not an error. Re-arm and spin again.
-                        boost::beast::get_lowest_layer(ws).expires_after(std::chrono::milliseconds(500));
+                        boost::beast::get_lowest_layer(ws).expires_after(std::chrono::milliseconds(wsTimeoutMs));
                         continue;
                     }
 
@@ -132,7 +141,7 @@ private:
 
                     json response = makeResponse(messageType, requestID);
 
-                    boost::beast::get_lowest_layer(ws).expires_after(std::chrono::milliseconds(500));
+                    boost::beast::get_lowest_layer(ws).expires_after(std::chrono::milliseconds(wsTimeoutMs));
                     ws.write(boost::asio::buffer(response.dump()));
                 }
             }
@@ -155,7 +164,7 @@ private:
 
         if (messageType == "AuthenticationTokenRequest")
         {
-            data = {{"authenticationToken", "mock-test-token"}};
+            data = {{"authenticationToken", mockAuthToken}};
             return envelope("AuthenticationTokenResponse", data, requestID);
         }
 
@@ -184,8 +193,8 @@ private:
 
     static json envelope(const std::string& messageType, const json& data, const std::string& requestID)
     {
-        return {{"apiName", "VTubeStudioPublicAPI"},
-                {"apiVersion", "1.0"},
+        return {{"apiName", linkjiru::vtsApiName},
+                {"apiVersion", linkjiru::vtsApiVersion},
                 {"requestID", requestID},
                 {"messageType", messageType},
                 {"data", data}};

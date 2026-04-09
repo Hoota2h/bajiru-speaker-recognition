@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "Constants.h"
 
 LinkjiruEditor::LinkjiruEditor(LinkjiruProcessor& p) : AudioProcessorEditor(&p), processor(p)
 {
@@ -19,7 +20,7 @@ LinkjiruEditor::LinkjiruEditor(LinkjiruProcessor& p) : AudioProcessorEditor(&p),
 
     detectLabel.setJustificationType(juce::Justification::centred);
     detectLabel.setFont(juce::FontOptions(13.0f));
-    detectLabel.setText("LinkjiruDetectLowji = --", juce::dontSendNotification);
+    detectLabel.setText(juce::String(linkjiru::detectParamName) + " = --", juce::dontSendNotification);
     detectLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
 
     vtsStatusLabel.setJustificationType(juce::Justification::centred);
@@ -58,11 +59,18 @@ void LinkjiruEditor::stopAsync()
     statusLabel.setText("Status: Stopping...", juce::dontSendNotification);
     statusLabel.setColour(juce::Label::textColourId, juce::Colours::orange);
 
+    /* Paranoia: SafePointer guards against use-after-free: if the DAW destroys
+       the editor while stopAnalysis() is blocking, the lambda skips
+       the write to stoppingInProgress instead of hitting freed memory. */
+    auto safeThis = juce::Component::SafePointer<LinkjiruEditor>(this);
     juce::Thread::launch(
-        [this]
+        [safeThis, &proc = processor]
         {
-            processor.stopAnalysis();
-            stoppingInProgress.store(false);
+            proc.stopAnalysis();
+            if (safeThis != nullptr)
+            {
+                safeThis->stoppingInProgress.store(false);
+            }
         });
 }
 
@@ -79,11 +87,15 @@ void LinkjiruEditor::restartAsync()
     statusLabel.setText("Status: Restarting...", juce::dontSendNotification);
     statusLabel.setColour(juce::Label::textColourId, juce::Colours::orange);
 
+    auto safeThis = juce::Component::SafePointer<LinkjiruEditor>(this);
     juce::Thread::launch(
-        [this]
+        [safeThis, &proc = processor]
         {
-            processor.restartAnalysis();
-            stoppingInProgress.store(false);
+            proc.restartAnalysis();
+            if (safeThis != nullptr)
+            {
+                safeThis->stoppingInProgress.store(false);
+            }
         });
 }
 
@@ -106,12 +118,13 @@ void LinkjiruEditor::timerCallback()
     if (processor.isAnalysisRunning())
     {
         const float val = processor.getDetectValue();
-        detectLabel.setText("LinkjiruDetectLowji = " + juce::String(val, 1), juce::dontSendNotification);
+        detectLabel.setText(juce::String(linkjiru::detectParamName) + " = " + juce::String(val, 1),
+                            juce::dontSendNotification);
         detectLabel.setColour(juce::Label::textColourId, val > 0.5f ? juce::Colours::limegreen : juce::Colours::grey);
     }
     else
     {
-        detectLabel.setText("LinkjiruDetectLowji = --", juce::dontSendNotification);
+        detectLabel.setText(juce::String(linkjiru::detectParamName) + " = --", juce::dontSendNotification);
         detectLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
     }
 }
@@ -122,7 +135,7 @@ void LinkjiruEditor::paint(juce::Graphics& g)
 
     g.setColour(juce::Colours::white);
     g.setFont(juce::Font(juce::FontOptions(22.0f).withStyle("Bold")));
-    g.drawText("Linkjiru", getLocalBounds().removeFromTop(50), juce::Justification::centred);
+    g.drawText(linkjiru::pluginName, getLocalBounds().removeFromTop(50), juce::Justification::centred);
 }
 
 void LinkjiruEditor::resized()

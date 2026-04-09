@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "Constants.h"
 #include "SharedRingBuffer.h"
 #include <string>
 #include <vector>
@@ -36,7 +37,8 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    void startAnalysis(const std::string& vtsHost = "localhost", const std::string& vtsPort = "8001");
+    void startAnalysis(const std::string& vtsHost = linkjiru::defaultVtsHost,
+                       const std::string& vtsPort = linkjiru::defaultVtsPort);
     void stopAnalysis();
     void restartAnalysis();
     bool isAnalysisRunning() const { return analysisRunning.load(); }
@@ -49,9 +51,7 @@ public:
     float getDetectValue() const;
 
 private:
-    static constexpr int ringBufferCapacity = 131072; // ~3s at 44.1kHz mono
-
-    SharedRingBuffer<ringBufferCapacity> sharedBuffer;
+    SharedRingBuffer<linkjiru::ringBufferCapacity> sharedBuffer;
 
     std::atomic<bool> analysisRunning{false};
     std::unique_ptr<AnalysisThread> analysisThread;

@@ -3,6 +3,20 @@
 #include "AnalysisThread.h"
 #include "RmsAnalyzer.h"
 
+namespace
+{
+
+/* Pre-allocated mono mix buffer (floats).  65536 (256 KB) is
+   large enough that no sane host block size forces a realloc
+   on the audio thread. */
+constexpr int preAllocBufferSize = 65536;
+
+/* Seconds of audio fed to RmsAnalyzer during calibration.
+   1.5 s is long enough for a stable noise-floor estimate. */
+constexpr double calibrationTimeSec = 1.5;
+
+} // namespace
+
 LinkjiruProcessor::LinkjiruProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
@@ -16,7 +30,7 @@ LinkjiruProcessor::LinkjiruProcessor()
        allocate on the audio thread when some rogue host decides to surprise
        us with a block size it never mentioned. Only the first N samples get
        touched per callback — the rest sits cold in virtual memory. */
-    monoMixBuf.resize(65536);
+    monoMixBuf.resize(preAllocBufferSize);
 }
 
 LinkjiruProcessor::~LinkjiruProcessor()
@@ -72,14 +86,20 @@ void LinkjiruProcessor::prepareToPlay(const double sampleRate, const int samples
 {
     currentSampleRate = sampleRate;
     currentBlockSize  = samplesPerBlock;
-    monoMixBuf.resize(static_cast<size_t>(samplesPerBlock));
+
+    // Only grow — never shrink below the pre-allocated floor,
+    // otherwise a rogue host can force an audio-thread realloc.
+    if (static_cast<size_t>(samplesPerBlock) > monoMixBuf.size())
+    {
+        monoMixBuf.resize(static_cast<size_t>(samplesPerBlock));
+    }
 }
 
 void LinkjiruProcessor::releaseResources()
 {
     if (analysisThread)
     {
-        analysisThread->stopThread(3000);
+        analysisThread->stopThread(linkjiru::threadStopTimeoutMs);
         analysisThread.reset();
     }
 
@@ -145,10 +165,7 @@ void LinkjiruProcessor::startAnalysis(const std::string& vtsHost, const std::str
     }
 
     RmsAnalyzer::Config rmsConfig;
-    /* This multiplier determines how much above the noise floor the threshold is set.
-       Higher = less sensitive. */
-    rmsConfig.noiseFloorMultiplier = 4.0f;
-    rmsConfig.calibrationSamples   = static_cast<int>(currentSampleRate * 1.5);
+    rmsConfig.calibrationSamples = static_cast<int>(currentSampleRate * calibrationTimeSec);
 
     AnalysisThread::Config threadConfig;
     threadConfig.vtsHost = vtsHost;
@@ -163,7 +180,7 @@ void LinkjiruProcessor::stopAnalysis()
 {
     if (analysisThread)
     {
-        analysisThread->stopThread(3000);
+        analysisThread->stopThread(linkjiru::threadStopTimeoutMs);
         analysisThread.reset();
     }
 

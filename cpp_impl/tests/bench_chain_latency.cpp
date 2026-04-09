@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include "Constants.h"
 #include "SharedRingBuffer.h"
 #include "RmsAnalyzer.h"
 #include "bench_csv.h"
@@ -10,15 +11,29 @@
 #include <thread>
 #include <vector>
 
-static constexpr int CAPACITY = 131072;
-static constexpr int WINDOW = 2048;
+// Production values — keep benchmarks in sync with real config.
+static constexpr int CAPACITY = linkjiru::ringBufferCapacity;
+static constexpr int WINDOW   = linkjiru::defaultAnalysisWindow;
 
-static constexpr double MAX_INPUT_LATENCY_US = 20'000.0;
+/* Absolute latency ceilings (us).  Benchmark fails if mean exceeds these.
+   - Input:   write + readLastN round-trip.
+   - Compute: single isSpeechActive() call.
+   - Output:  state-machine update + atomic store.
+   - Full:    all three combined. */
+static constexpr double MAX_INPUT_LATENCY_US   = 20'000.0;
 static constexpr double MAX_COMPUTE_LATENCY_US = 100.0;
-static constexpr double MAX_OUTPUT_LATENCY_US = 10.0;
-static constexpr double MAX_FULL_CHAIN_US = 25'000.0;
+static constexpr double MAX_OUTPUT_LATENCY_US  = 10.0;
+static constexpr double MAX_FULL_CHAIN_US      = 25'000.0;
 
-static const std::string CSV_PATH = "bench_results.csv";
+static constexpr int BENCH_ITERATIONS = 10000;
+
+/* Mirrors AnalysisThread::Config defaults for the state-machine
+   simulation in OutputLatency / FullChainLatency. */
+static constexpr int SUSTAIN_MS       = 100; // speech-sustain hold
+static constexpr int POLL_INTERVAL_MS = 16;  // ~60 fps fake clock tick
+
+// Typical DAW block size for write-path benchmarks.
+static constexpr int WRITE_BLOCK_SIZE = 512;
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -41,40 +56,35 @@ protected:
     SharedRingBuffer<CAPACITY> buffer;
     std::unordered_map<std::string, BenchBaseline> baselines;
 
-    void SetUp() override
-    {
-        baselines = loadBaselines(CSV_PATH);
-    }
+    void SetUp() override { baselines = loadBaselines(BENCH_CSV_PATH); }
 };
 
 TEST_F(ChainLatencyBench, ComputeLatency)
 {
     RmsAnalyzer::Config cfg;
-    cfg.calibrationSamples = 2048;
+    cfg.calibrationSamples = WINDOW;
     RmsAnalyzer analyzer(cfg);
 
-    const auto silence = generateSilence(2048);
-    analyzer.calibrate(silence.data(), 2048);
+    const auto silence = generateSilence(WINDOW);
+    analyzer.calibrate(silence.data(), WINDOW);
     ASSERT_TRUE(analyzer.isCalibrated());
 
     const auto speech = generateSpeech(WINDOW);
     std::vector<double> timings;
 
-    for (int iter = 0; iter < 10000; ++iter)
+    for (int iter = 0; iter < BENCH_ITERATIONS; ++iter)
     {
-        auto start = Clock::now();
+        auto start           = Clock::now();
         volatile bool result = analyzer.isSpeechActive(speech.data(), WINDOW);
-        auto end = Clock::now();
+        auto end             = Clock::now();
         (void)result;
 
-        timings.push_back(
-            std::chrono::duration<double, std::micro>(end - start).count());
+        timings.push_back(std::chrono::duration<double, std::micro>(end - start).count());
     }
 
     const double m = vecMean(timings);
     const double s = vecStddev(timings, m);
-    checkBenchmark(CSV_PATH, baselines, "ComputeLatency_RMS_2048", m, s,
-                   MAX_COMPUTE_LATENCY_US);
+    checkBenchmark(BENCH_CSV_PATH, baselines, "ComputeLatency_RMS_2048", m, s, MAX_COMPUTE_LATENCY_US);
 }
 
 TEST_F(ChainLatencyBench, OutputLatency)
@@ -82,23 +92,22 @@ TEST_F(ChainLatencyBench, OutputLatency)
     std::atomic<float> detectValue{0.0f};
     bool currentlySpeaking = false;
     int64_t lastSpeechTime = 0;
-    static constexpr int sustainMs = 100;
     std::vector<double> timings;
 
-    for (int iter = 0; iter < 10000; ++iter)
+    for (int iter = 0; iter < BENCH_ITERATIONS; ++iter)
     {
         const bool speechDetected = (iter % 2 == 0);
-        const auto now = static_cast<int64_t>(iter * 16);
+        const auto now            = static_cast<int64_t>(iter * POLL_INTERVAL_MS);
 
         auto start = Clock::now();
 
+        // Mirror production (AnalysisThread::run) — no guard on the assignment.
         if (speechDetected)
         {
-            lastSpeechTime = now;
-            if (!currentlySpeaking)
-                currentlySpeaking = true;
+            lastSpeechTime    = now;
+            currentlySpeaking = true;
         }
-        else if (currentlySpeaking && (now - lastSpeechTime > sustainMs))
+        else if (currentlySpeaking && (now - lastSpeechTime > SUSTAIN_MS))
         {
             currentlySpeaking = false;
         }
@@ -107,14 +116,12 @@ TEST_F(ChainLatencyBench, OutputLatency)
 
         auto end = Clock::now();
 
-        timings.push_back(
-            std::chrono::duration<double, std::micro>(end - start).count());
+        timings.push_back(std::chrono::duration<double, std::micro>(end - start).count());
     }
 
     const double m = vecMean(timings);
     const double s = vecStddev(timings, m);
-    checkBenchmark(CSV_PATH, baselines, "OutputLatency_StateMachine", m, s,
-                   MAX_OUTPUT_LATENCY_US);
+    checkBenchmark(BENCH_CSV_PATH, baselines, "OutputLatency_StateMachine", m, s, MAX_OUTPUT_LATENCY_US);
 }
 
 TEST_F(ChainLatencyBench, InputLatency)
@@ -126,46 +133,43 @@ TEST_F(ChainLatencyBench, InputLatency)
     const auto silence = generateSilence(CAPACITY / 2);
     buffer.write(silence.data(), CAPACITY / 2);
 
-    const auto speech = generateSpeech(512);
+    const auto speech = generateSpeech(WRITE_BLOCK_SIZE);
     std::vector<float> dest(WINDOW);
     std::vector<double> timings;
 
     for (int iter = 0; iter < 1000; ++iter)
     {
         auto start = Clock::now();
-        buffer.write(speech.data(), 512);
+        buffer.write(speech.data(), WRITE_BLOCK_SIZE);
         buffer.readLastN(dest.data(), WINDOW);
         auto end = Clock::now();
 
-        timings.push_back(
-            std::chrono::duration<double, std::micro>(end - start).count());
+        timings.push_back(std::chrono::duration<double, std::micro>(end - start).count());
     }
 
     const double m = vecMean(timings);
     const double s = vecStddev(timings, m);
-    checkBenchmark(CSV_PATH, baselines, "InputLatency_Write_to_Read",
-                   m, s, MAX_INPUT_LATENCY_US);
+    checkBenchmark(BENCH_CSV_PATH, baselines, "InputLatency_Write_to_Read", m, s, MAX_INPUT_LATENCY_US);
 }
 
 TEST_F(ChainLatencyBench, FullChainLatency)
 {
     RmsAnalyzer::Config cfg;
-    cfg.calibrationSamples = 2048;
+    cfg.calibrationSamples = WINDOW;
     RmsAnalyzer analyzer(cfg);
 
-    const auto silence = generateSilence(2048);
-    buffer.write(silence.data(), 2048);
+    const auto silence = generateSilence(WINDOW);
+    buffer.write(silence.data(), WINDOW);
 
     std::vector<float> windowBuf(WINDOW);
     buffer.readLastN(windowBuf.data(), WINDOW);
     analyzer.calibrate(windowBuf.data(), WINDOW);
     ASSERT_TRUE(analyzer.isCalibrated());
 
-    const auto speech = generateSpeech(512);
+    const auto speech = generateSpeech(WRITE_BLOCK_SIZE);
     std::atomic<float> detectValue{0.0f};
     bool currentlySpeaking = false;
     int64_t lastSpeechTime = 0;
-    static constexpr int sustainMs = 100;
 
     std::vector<double> timings;
 
@@ -173,18 +177,17 @@ TEST_F(ChainLatencyBench, FullChainLatency)
     {
         auto start = Clock::now();
 
-        buffer.write(speech.data(), 512);
+        buffer.write(speech.data(), WRITE_BLOCK_SIZE);
         buffer.readLastN(windowBuf.data(), WINDOW);
         const bool speechDetected = analyzer.isSpeechActive(windowBuf.data(), WINDOW);
 
-        const auto now = static_cast<int64_t>(iter * 16);
+        const auto now = static_cast<int64_t>(iter * POLL_INTERVAL_MS);
         if (speechDetected)
         {
-            lastSpeechTime = now;
-            if (!currentlySpeaking)
-                currentlySpeaking = true;
+            lastSpeechTime    = now;
+            currentlySpeaking = true;
         }
-        else if (currentlySpeaking && (now - lastSpeechTime > sustainMs))
+        else if (currentlySpeaking && (now - lastSpeechTime > SUSTAIN_MS))
         {
             currentlySpeaking = false;
         }
@@ -193,12 +196,10 @@ TEST_F(ChainLatencyBench, FullChainLatency)
 
         auto end = Clock::now();
 
-        timings.push_back(
-            std::chrono::duration<double, std::micro>(end - start).count());
+        timings.push_back(std::chrono::duration<double, std::micro>(end - start).count());
     }
 
     const double m = vecMean(timings);
     const double s = vecStddev(timings, m);
-    checkBenchmark(CSV_PATH, baselines, "FullChainLatency", m, s,
-                   MAX_FULL_CHAIN_US);
+    checkBenchmark(BENCH_CSV_PATH, baselines, "FullChainLatency", m, s, MAX_FULL_CHAIN_US);
 }

@@ -26,6 +26,18 @@ namespace net       = boost::asio;
 using tcp           = net::ip::tcp;
 using json          = nlohmann::json;
 
+namespace
+{
+
+/*  Max inbound WebSocket (Ws/WS) message (bytes).
+    256 KB covers the largest VTS responses (model lists, etc.). */
+constexpr std::size_t maxWsMessageSize = std::size_t{256} * 1024;
+
+/* Temp-file suffix for atomic write-then-rename in saveToken(). */
+constexpr const char* tokenTmpSuffix = ".tmp";
+
+} // namespace
+
 struct VTubeStudioClient::WebSocketState
 {
     // ReSharper disable once CppDFATimeOver
@@ -59,8 +71,8 @@ struct VTubeStudioClient::WebSocketState
 static json makeEnvelope(const std::string& messageType, const json& data,
                          const std::string& requestID = "linkjiru-req")
 {
-    return {{"apiName", "VTubeStudioPublicAPI"},
-            {"apiVersion", "1.0"},
+    return {{"apiName", linkjiru::vtsApiName},
+            {"apiVersion", linkjiru::vtsApiVersion},
             {"requestID", requestID},
             {"messageType", messageType},
             {"data", data}};
@@ -85,7 +97,7 @@ bool VTubeStudioClient::connect(const std::string& host, const std::string& port
         {
             if (wsState->ws->is_open())
             {
-                beast::get_lowest_layer(*wsState->ws).expires_after(std::chrono::seconds(3));
+                beast::get_lowest_layer(*wsState->ws).expires_after(std::chrono::milliseconds(OP_TIMEOUT_MS));
                 wsState->ws->close(websocket::close_code::normal);
             }
         }
@@ -103,13 +115,13 @@ bool VTubeStudioClient::connect(const std::string& host, const std::string& port
 
         wsState->ws = std::make_unique<websocket::stream<beast::tcp_stream>>(wsState->ioc);
 
-        beast::get_lowest_layer(*wsState->ws).expires_after(std::chrono::seconds(1));
+        beast::get_lowest_layer(*wsState->ws).expires_after(std::chrono::milliseconds(OP_TIMEOUT_MS));
         beast::get_lowest_layer(*wsState->ws).connect(results);
 
-        beast::get_lowest_layer(*wsState->ws).expires_after(std::chrono::seconds(3));
+        beast::get_lowest_layer(*wsState->ws).expires_after(std::chrono::milliseconds(OP_TIMEOUT_MS));
         wsState->ws->handshake(host + ":" + port, "/");
 
-        wsState->ws->read_message_max(static_cast<std::size_t>(256) * 1024);
+        wsState->ws->read_message_max(maxWsMessageSize);
 
         connected.store(true);
         return true;
@@ -132,7 +144,7 @@ void VTubeStudioClient::disconnect()
         {
             if (wsState->ws->is_open())
             {
-                beast::get_lowest_layer(*wsState->ws).expires_after(std::chrono::seconds(3));
+                beast::get_lowest_layer(*wsState->ws).expires_after(std::chrono::milliseconds(OP_TIMEOUT_MS));
                 wsState->ws->close(websocket::close_code::normal);
             }
         }
@@ -185,10 +197,11 @@ bool VTubeStudioClient::authenticate()
     {
         try
         {
-            const auto req = makeEnvelope(
-                "AuthenticationRequest",
-                {{"pluginName", PLUGIN_NAME}, {"pluginDeveloper", DEVELOPER_NAME}, {"authenticationToken", token}},
-                "auth-stored");
+            const auto req = makeEnvelope("AuthenticationRequest",
+                                          {{"pluginName", linkjiru::pluginName},
+                                           {"pluginDeveloper", linkjiru::developerName},
+                                           {"authenticationToken", token}},
+                                          "auth-stored");
 
             auto resp = wsState->sendRequest(req, OP_TIMEOUT_MS);
 
@@ -207,9 +220,9 @@ bool VTubeStudioClient::authenticate()
 
     try
     {
-        const auto tokenReq =
-            makeEnvelope("AuthenticationTokenRequest",
-                         {{"pluginName", PLUGIN_NAME}, {"pluginDeveloper", DEVELOPER_NAME}}, "auth-token-req");
+        const auto tokenReq = makeEnvelope(
+            "AuthenticationTokenRequest",
+            {{"pluginName", linkjiru::pluginName}, {"pluginDeveloper", linkjiru::developerName}}, "auth-token-req");
 
         auto tokenResp = wsState->sendRequest(tokenReq, AUTH_POPUP_TIMEOUT_MS);
 
@@ -221,10 +234,11 @@ bool VTubeStudioClient::authenticate()
         token = tokenResp["data"]["authenticationToken"].get<std::string>();
         saveToken(token);
 
-        const auto authReq = makeEnvelope(
-            "AuthenticationRequest",
-            {{"pluginName", PLUGIN_NAME}, {"pluginDeveloper", DEVELOPER_NAME}, {"authenticationToken", token}},
-            "auth-req");
+        const auto authReq = makeEnvelope("AuthenticationRequest",
+                                          {{"pluginName", linkjiru::pluginName},
+                                           {"pluginDeveloper", linkjiru::developerName},
+                                           {"authenticationToken", token}},
+                                          "auth-req");
 
         auto authResp = wsState->sendRequest(authReq, OP_TIMEOUT_MS);
 
@@ -325,7 +339,7 @@ std::string VTubeStudioClient::getTokenFilePath()
         return {};
     }
 
-    return result + "\\Linkjiru\\vts_token.dat";
+    return result + "\\" + linkjiru::pluginName + "\\vts_token.dat";
 }
 
 bool VTubeStudioClient::loadToken(std::string& token)
@@ -386,7 +400,7 @@ bool VTubeStudioClient::saveToken(const std::string& token)
         return false;
     }
 
-    const std::string tmpPath = path + ".tmp";
+    const std::string tmpPath = path + tokenTmpSuffix;
     {
         std::ofstream file(tmpPath, std::ios::binary);
         if (!file.is_open())

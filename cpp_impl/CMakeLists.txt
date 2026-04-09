@@ -63,7 +63,7 @@ juce_add_plugin(Linkjiru
 
 target_link_libraries(Linkjiru PRIVATE SharedCode)
 
-add_custom_target(BuildAll DEPENDS Linkjiru_VST Linkjiru_VST3 Linkjiru_Standalone)
+add_custom_target(BuildAll DEPENDS Linkjiru_VST Linkjiru_VST3 Linkjiru_Standalone LinkjiruTests LinkjiruBenchmarks)
 
 add_custom_command(TARGET Linkjiru_VST3 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/artifacts"

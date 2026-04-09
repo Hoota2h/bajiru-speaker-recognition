@@ -21,6 +21,7 @@ __pycache__/
 
 # CMake
 cmake-build-*/
+build/
 
 # Misc
 target/
@@ -29,3 +30,4 @@ target/
 cpp_impl/.idea
 cpp_impl/cmake-build-debug
 cpp_impl/cmake-build-release
+cpp_impl/artifacts/*

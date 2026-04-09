@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include "Constants.h"
 #include "SharedRingBuffer.h"
 #include "bench_csv.h"
 
@@ -7,14 +8,19 @@
 #include <string>
 #include <vector>
 
-static constexpr int CAPACITY   = 131072;
+// Production values.
+static constexpr int CAPACITY = linkjiru::ringBufferCapacity;
+static constexpr int WINDOW   = linkjiru::defaultAnalysisWindow;
+
 static constexpr int ITERATIONS = 1000;
 
+/* Performance ceilings — benchmark fails if breached.
+   - Write:   max us per sample.
+   - Read:    max us for one readLastN snapshot.
+   - SeqRead: min samples/sec for sequential cursor reads. */
 static constexpr double MAX_WRITE_US_PER_SAMPLE  = 1.0;
 static constexpr double MAX_READ_LAST_N_US       = 50.0;
 static constexpr double MIN_SEQ_READ_SAMPLES_SEC = 100'000'000.0;
-
-static const std::string CSV_PATH = "bench_results.csv";
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -24,10 +30,7 @@ protected:
     SharedRingBuffer<CAPACITY> buffer;
     std::unordered_map<std::string, BenchBaseline> baselines;
 
-    void SetUp() override
-    {
-        baselines = loadBaselines(CSV_PATH);
-    }
+    void SetUp() override { baselines = loadBaselines(BENCH_CSV_PATH); }
 
     static std::vector<float> generateSamples(const int count)
     {
@@ -48,45 +51,51 @@ protected:
             buffer.write(samples.data(), blockSize);
             auto end = Clock::now();
 
-            timings.push_back(
-                std::chrono::duration<double, std::micro>(end - start).count()
-                / static_cast<double>(blockSize));
+            timings.push_back(std::chrono::duration<double, std::micro>(end - start).count() /
+                              static_cast<double>(blockSize));
         }
 
-        const double m = vecMean(timings);
-        const double s = vecStddev(timings, m);
+        const double m         = vecMean(timings);
+        const double s         = vecStddev(timings, m);
         const std::string name = "WriteThroughput_" + std::to_string(blockSize);
-        checkBenchmark(CSV_PATH, baselines, name, m, s, MAX_WRITE_US_PER_SAMPLE, true, "us/sample");
+        checkBenchmark(BENCH_CSV_PATH, baselines, name, m, s, MAX_WRITE_US_PER_SAMPLE, true, "us/sample");
     }
 };
 
-TEST_F(RingBufferBench, WriteThroughput_64)   { benchWrite(64); }
-TEST_F(RingBufferBench, WriteThroughput_512)  { benchWrite(512); }
-TEST_F(RingBufferBench, WriteThroughput_2048) { benchWrite(2048); }
+TEST_F(RingBufferBench, WriteThroughput_64)
+{
+    benchWrite(64);
+}
+TEST_F(RingBufferBench, WriteThroughput_512)
+{
+    benchWrite(512);
+}
+TEST_F(RingBufferBench, WriteThroughput_2048)
+{
+    benchWrite(2048);
+}
 
 TEST_F(RingBufferBench, ReadLastN_Latency)
 {
-    const auto samples = generateSamples(2048);
+    const auto samples = generateSamples(WINDOW);
     for (int i = 0; i < 100; ++i)
-        buffer.write(samples.data(), 2048);
+        buffer.write(samples.data(), WINDOW);
 
-    std::vector<float> dest(2048);
+    std::vector<float> dest(WINDOW);
     std::vector<double> timings;
 
     for (int iter = 0; iter < ITERATIONS; ++iter)
     {
         auto start = Clock::now();
-        buffer.readLastN(dest.data(), 2048);
+        buffer.readLastN(dest.data(), WINDOW);
         auto end = Clock::now();
 
-        timings.push_back(
-            std::chrono::duration<double, std::micro>(end - start).count());
+        timings.push_back(std::chrono::duration<double, std::micro>(end - start).count());
     }
 
     const double m = vecMean(timings);
     const double s = vecStddev(timings, m);
-    checkBenchmark(CSV_PATH, baselines, "ReadLastN_Latency_2048", m, s,
-                   MAX_READ_LAST_N_US);
+    checkBenchmark(BENCH_CSV_PATH, baselines, "ReadLastN_Latency_2048", m, s, MAX_READ_LAST_N_US);
 }
 
 TEST_F(RingBufferBench, SequentialRead_Throughput)
@@ -110,11 +119,10 @@ TEST_F(RingBufferBench, SequentialRead_Throughput)
     }
     const auto end = Clock::now();
 
-    const double seconds = std::chrono::duration<double>(end - start).count();
+    const double seconds       = std::chrono::duration<double>(end - start).count();
     const double samplesPerSec = static_cast<double>(totalSamples) / seconds;
 
-    checkBenchmark(CSV_PATH, baselines, "SequentialRead_Throughput",
-                   samplesPerSec / 1e6, 0.0,
+    checkBenchmark(BENCH_CSV_PATH, baselines, "SequentialRead_Throughput", samplesPerSec / 1e6, 0.0,
                    MIN_SEQ_READ_SAMPLES_SEC / 1e6, false, "M samples/sec");
 }
 
