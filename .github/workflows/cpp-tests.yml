@@ -1,0 +1,61 @@
+name: C++ Tests
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'cpp_impl/src/**'
+      - 'cpp_impl/tests/**'
+      - 'cpp_impl/CMakeLists.txt'
+  pull_request:
+    paths:
+      - 'cpp_impl/src/**'
+      - 'cpp_impl/tests/**'
+      - 'cpp_impl/CMakeLists.txt'
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure CMake
+        working-directory: cpp_impl
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build unit tests
+        working-directory: cpp_impl
+        run: cmake --build build --target LinkjiruTests
+
+      - name: Run unit tests (no networking)
+        working-directory: cpp_impl/build/tests
+        run: ./LinkjiruTests.exe --gtest_filter=-*RealPlugin*
+
+      - name: Run integration tests (localhost)
+        working-directory: cpp_impl/build/tests
+        continue-on-error: true
+        run: ./LinkjiruTests.exe --gtest_filter=*RealPlugin*
+
+      - name: Build benchmarks
+        working-directory: cpp_impl
+        run: cmake --build build --target LinkjiruBenchmarks
+
+      - name: Run benchmarks
+        working-directory: cpp_impl/build/tests
+        continue-on-error: true
+        run: ./LinkjiruBenchmarks.exe
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: cpp_impl/build/tests/bench_results.csv
+          if-no-files-found: ignore

@@ -1,0 +1,27 @@
+BasedOnStyle: Microsoft
+Language: Cpp
+Standard: c++17
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+
+BreakBeforeBraces: Allman
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+SortIncludes: false
+
+SpaceAfterTemplateKeyword: true
+SpaceBeforeParens: ControlStatements
+
+AccessModifierOffset: -4
+IndentAccessModifiers: false
+
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: false

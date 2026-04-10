@@ -1,0 +1,25 @@
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-empty-catch,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-avoid-non-const-global-variables,
+  misc-redundant-expression,
+  modernize-use-override,
+  modernize-use-nullptr,
+  performance-*,
+  readability-braces-around-statements,
+  readability-misleading-indentation,
+  readability-redundant-smartptr-get,
+
+WarningsAsErrors: ''
+
+HeaderFilterRegex: 'src/linkjiru/.*'
+
+CheckOptions:
+  - key: bugprone-argument-comment.StrictMode
+    value: false
+  - key: performance-unnecessary-value-param.AllowedTypes
+    value: 'juce::String'
