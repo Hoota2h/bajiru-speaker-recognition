@@ -12,10 +12,6 @@ type-check = ["mypy", "types-pyaudio"]
 lint = ["ruff", "pylint"]
 test = ["pytest", "pytest-cov", "pytest-xdist", "pytest-unused-fixtures"]
 
-[tool.bandit]
-assert_used = { skips = ["**/test_*.py"] }
-exclude = ["build/"]
-
 [tool.pylint.messages_control]
 disable = [
     "line-too-long",
@@ -46,7 +42,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
-"tests/**/*.py" = [
+"**/tests/**/*.py" = [
     "S101",    # asserts allowed in tests...
     "ARG",     # Unused function args -> fixtures nevertheless are functionally relevant...
     "FBT",     # Don't care about booleans as positional arguments in tests, e.g. via @pytest.mark.parametrize()
@@ -57,6 +53,9 @@ ignore = [
 ]
 [tool.ruff.lint.pylint]
 max-args = 6
+
+[tool.ruff.lint.isort]
+known-first-party = ["baji_recognition", "pitch_math"]
 
 [tool.pylint.'MESSAGES CONTROL']
 max-line-length = 115

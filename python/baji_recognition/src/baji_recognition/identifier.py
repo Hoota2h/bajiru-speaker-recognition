@@ -25,7 +25,15 @@ SILENCE_CUTOFF = -45
 
 
 class Thing:
+    """Prototype for ingesting live mic data and determining the speaker"""
+
     def __init__(self) -> None:
+        """Set up prototype.
+
+        If a token to retrieve/use an existing pyannote model is present, use that, otherwise,
+        default to a non-ML approach. Currently, the ML approach is unfinished
+
+        """
         self.format = pyaudio.paFloat32
         self.channels = 1
         self.rate = RATE
@@ -45,7 +53,8 @@ class Thing:
             logger.warning(
                 "No HUGGING_TOKEN Face token found to retrieve pretrained model, defaulting to simple threshold"
             )
-        # self.pipeline.to(torch.device("cuda"))
+        # The below may need to be modified or removed (or moved to within the if/else above)
+        # self.pipeline.to(torch.device("cuda"))  # noqa:ERA001
 
     def start(self) -> None:
         self.p = pyaudio.PyAudio()
