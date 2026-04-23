@@ -1,0 +1,22 @@
+[project]
+name = "data-augment"
+version = "0.1.0"
+description = "Offline audio data augmentation library — high-quality PSOLA pitch shifting with sinc resampling"
+license = "MIT"
+requires-python = "==3.12.*"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.14",
+]
+
+[project.optional-dependencies]
+# librosa is kept as an opt-in reference/fallback backend. The native backend
+# is pure numpy/scipy and matches librosa.pyin within float precision.
+librosa = ["librosa>=0.11.0"]
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+# addopts = "-v"  # uncomment to make pytest list each test by name

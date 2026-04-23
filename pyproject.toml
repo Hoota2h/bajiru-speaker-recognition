@@ -51,6 +51,11 @@ ignore = [
     "D103",    # I don't like docstrings *that* much
     "INP001",  # tests don't need to be a module
 ]
+"**/scripts/**/*.py" = [
+    "INP001",  # scripts aren't importable modules, they're runnable files
+    "T201",    # print() is the whole point of example / usage scripts
+]
+
 [tool.ruff.lint.pylint]
 max-args = 6
 
