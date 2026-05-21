@@ -21,7 +21,7 @@ def audio_meta(path: str) -> tuple[int, int]:
 
 
 def load_noise(audio: str):
-    sample_rate, samples = audio_meta(audio)
+    _sample_rate, samples = audio_meta(audio)
     out_scores: np.ndarray = np.zeros((samples, 4), dtype=np.byte)
     out_scores[:, 3].fill(1)
     return out_scores
@@ -36,7 +36,7 @@ def scores_from_labels(audio: str, labels: str):
         "en": [],  # additional label for environment noises
     }
     with open(labels) as file:
-        for line in file.readlines():
+        for line in file:
             [start, end, label] = line.strip().split("\t")
             label_map[label].append((float(start), float(end)))
 
@@ -74,7 +74,7 @@ def smooth_scores(scores: np.ndarray, shift: int) -> np.ndarray:
 
 # Makes 2 raw files for audio data and scores
 def convert_noise(path: str):
-    sample_rate, audio_data = wav.read(path + ".wav")
+    _sample_rate, audio_data = wav.read(path + ".wav")
     np.memmap(
         path + ".audio", dtype=audio_data.dtype, mode="w+", shape=audio_data.shape
     )[:] = audio_data[:]
@@ -87,7 +87,7 @@ def convert_noise(path: str):
 
 # Makes 2 raw files for audio data and scores
 def convert_labeled(path: str):
-    sample_rate, audio_data = wav.read(path + ".wav")
+    _sample_rate, audio_data = wav.read(path + ".wav")
     np.memmap(
         path + ".audio", dtype=audio_data.dtype, mode="w+", shape=audio_data.shape
     )[:] = audio_data[:]
