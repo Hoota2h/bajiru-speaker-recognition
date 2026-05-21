@@ -11,6 +11,7 @@ resolution-markers = [
 members = [
     "baji-recognition",
     "data-augment",
+    "nn-model",
     "pitch-math",
 ]
 
@@ -1084,6 +1085,30 @@ sdist = { url = "https://files.pythonhosted.org/packages/6a/51/63fe664f3908c97be
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl", hash = "sha256:d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762", size = 2068504, upload-time = "2025-12-08T17:02:38.159Z" },
 ]
+
+[[package]]
+name = "nn-model"
+version = "0.1.0"
+source = { editable = "python/nn_model" }
+dependencies = [
+    { name = "librosa" },
+    { name = "numpy" },
+    { name = "torch" },
+]
+
+[package.optional-dependencies]
+scipy = [
+    { name = "scipy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "librosa", specifier = ">=0.11" },
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "scipy", marker = "extra == 'scipy'", specifier = ">=1.14" },
+    { name = "torch", specifier = ">=2.10" },
+]
+provides-extras = ["scipy"]
 
 [[package]]
 name = "nodeenv"
