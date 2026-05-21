@@ -17,7 +17,7 @@ Installations:
 
 ```bash
 uv sync
-prek install
+uv run prek install
 ```
 
 ## License
