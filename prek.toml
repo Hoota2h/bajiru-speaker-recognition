@@ -1,18 +1,14 @@
 [[repos]]
-repo = "local"
-
-[[repos.hooks]]
-id = "ruff-format"
-name = "ruff-format"
-entry = "uv run ruff format python"
-language = "system"
-types = ["python"]
-files = "^python/"
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.15.3"
 
 [[repos.hooks]]
 id = "ruff-check"
-name = "ruff-check"
-entry = "uv run ruff check --fix python"
-language = "system"
-types = ["python"]
+args = ["--fix"]
+types_or = ["python", "pyi"]
+files = "^python/"
+
+[[repos.hooks]]
+id = "ruff-format"
+types_or = ["python", "pyi"]
 files = "^python/"
