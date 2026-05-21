@@ -1,0 +1,27 @@
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "ruff-format"
+name = "ruff-format"
+entry = "uv run ruff format python"
+language = "system"
+types = ["python"]
+files = "^python/"
+
+[[repos.hooks]]
+id = "ruff-check"
+name = "ruff-check"
+entry = "uv run ruff check --fix python"
+language = "system"
+types = ["python"]
+files = "^python/"
+
+[[repos.hooks]]
+id = "mypy"
+name = "mypy"
+entry = "uv run mypy python"
+language = "system"
+types = ["python"]
+files = "^python/"
+exclude = "tests/"
