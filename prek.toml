@@ -1,0 +1,14 @@
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.15.3"
+
+[[repos.hooks]]
+id = "ruff-check"
+args = ["--fix"]
+types_or = ["python", "pyi"]
+files = "^python/"
+
+[[repos.hooks]]
+id = "ruff-format"
+types_or = ["python", "pyi"]
+files = "^python/"

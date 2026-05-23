@@ -3,13 +3,13 @@ members = ["python/*"]
 
 [dependency-groups]
 dev = [
-    "pre-commit",
+    "prek",
     { include-group = "type-check" },
     { include-group = "lint" },
     { include-group = "test" },
 ]
 type-check = ["mypy", "types-pyaudio"]
-lint = ["ruff", "pylint"]
+lint = ["ruff"]
 test = ["pytest", "pytest-cov", "pytest-xdist", "pytest-unused-fixtures"]
 
 [tool.pylint.messages_control]
@@ -59,25 +59,6 @@ ignore = [
 [tool.ruff.lint.pylint]
 max-args = 6
 
-[tool.ruff.lint.isort]
-known-first-party = ["baji_recognition", "pitch_math"]
-
-[tool.pylint.'MESSAGES CONTROL']
-max-line-length = 115
-disable = """
-    line-too-long,
-    missing-module-docstring,
-"""
-max-args = 6
-
 [tool.mypy]
-files = ["."]
 exclude = ["build/"]
 strict = true
-explicit_package_bases = true
-mypy_path = ["python/src"]
-
-# add modules that don't have stubs (but those can be added for some imports)
-[[tool.mypy.overrides]]
-module = []
-ignore_missing_imports = true
