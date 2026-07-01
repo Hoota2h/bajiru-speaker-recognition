@@ -1,5 +1,6 @@
-import torch, onnx
 import model_preset
+import onnx
+import torch
 
 checkpoint_path = "checkpoints/last_N.pt"
 onnx_path = "model.onnx"

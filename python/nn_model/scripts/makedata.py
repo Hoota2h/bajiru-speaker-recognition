@@ -1,9 +1,11 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import scipy.io.wavfile as wav
-import time
+
+MIN_UPDATE_INTERVAL = 0.5
 
 
 def triangular_kernel(front_samples: int, rear_samples: int) -> np.ndarray:
@@ -64,14 +66,14 @@ def smooth(
     chunks = [(s, min(n_samples, s + chunk_size)) for s in starts]
 
     processed = 0
-    t0 = time.time()
-    last_report = t0
+    start_time = time.time()
+    last_report = start_time
     for i, (s, e) in enumerate(chunks):
         process_chunk(s, e)
         processed += e - s
         now = time.time()
-        if now - last_report >= 0.5 or processed == n_samples:
-            elapsed = now - t0
+        if now - last_report >= MIN_UPDATE_INTERVAL or processed == n_samples:
+            elapsed = now - start_time
             frac = processed / n_samples
             eta = (elapsed / frac) - elapsed if frac > 0 else float("inf")
             print(
