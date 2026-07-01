@@ -460,7 +460,6 @@ class ClassifierHead(nn.Module):
 
         """
         super().__init__()
-        self.max_input_size = n_history
         self.conv = nn.Conv1d(
             n_channels, n_inner, kernel_size=n_history, padding=0, bias=True
         )
@@ -468,14 +467,10 @@ class ClassifierHead(nn.Module):
         self.head = nn.Linear(n_inner, n_classes)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        pad = self.max_input_size - 1
-        x = tf.pad(x, (pad, 0))
-
-        x = self.conv(x)  # (B, n_inner, T)
-        x = x.transpose(1, 2)  # (B, T, n_inner)
-        x = x[:, -1, :]
+        x = self.conv(x)  # (B, n_inner, 1)
+        x = x.squeeze(-1)  # (B, n_inner)
         x = self.norm(x)
         x = tf.silu(x)
-        logits = self.head(x)  # (B, T, n_classes)
+        logits = self.head(x)  # (B, n_classes)
         scores = torch.sigmoid(logits)
         return scores, logits

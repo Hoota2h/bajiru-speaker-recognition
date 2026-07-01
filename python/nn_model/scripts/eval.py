@@ -191,5 +191,6 @@ if __name__ == "__main__":
         audio_mult=audio_mult,
     )
 
+    out_sample_rate = sample_rate // hop_length
     for i in range(model_preset.n_classes):
-        wav.write(args.outputs[i], sample_rate, scores[:, i].repeat(hop_length))
+        wav.write(args.outputs[i], out_sample_rate, scores[:, i])
