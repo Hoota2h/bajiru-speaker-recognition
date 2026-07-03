@@ -5,9 +5,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 import scipy.io.wavfile as wav
 
-MIN_UPDATE_INTERVAL = 0.5
+PROGRESS_DISPLAY_INTERVAL = 0.5
 
 
+# Asymmetric triangular kernel
 def triangular_kernel(front_samples: int, rear_samples: int) -> np.ndarray:
     front_part = np.linspace(1.0 / front_samples, 1.0, front_samples, endpoint=True)
     rear_part = np.linspace(
@@ -22,8 +23,7 @@ def triangular_kernel(front_samples: int, rear_samples: int) -> np.ndarray:
     return kern
 
 
-# Smoothes scores using asymmetric triangular kernel
-def smooth(
+def labels_to_scores(
     input_path: str,
     output_path: str,
     n_samples: int,
@@ -32,6 +32,18 @@ def smooth(
     rear_samples: int,
     chunk_size: int,
 ):
+    """Convert labels to scores used for model training, and smoothes them using triangular kernel
+
+    Args:
+        input_path (str): Path to 2d array with labels
+        output_path (str): Path to 2d array with scores
+        n_samples (int): Total number of samples in the audio file
+        n_scores (int): Number of label/score types
+        front_samples (int): Number of front samples for triangular kernel
+        rear_samples (int): Number of rear samples for triangular kernel
+        chunk_size (int): The size of the chunk used for batching
+
+    """
     inp = np.memmap(input_path, dtype=np.uint8, mode="r+", shape=(n_samples, n_scores))
     out = np.memmap(
         output_path, dtype=np.float16, mode="w+", shape=(n_samples, n_scores)
@@ -72,7 +84,7 @@ def smooth(
         process_chunk(s, e)
         processed += e - s
         now = time.time()
-        if now - last_report >= MIN_UPDATE_INTERVAL or processed == n_samples:
+        if now - last_report >= PROGRESS_DISPLAY_INTERVAL or processed == n_samples:
             elapsed = now - start_time
             frac = processed / n_samples
             eta = (elapsed / frac) - elapsed if frac > 0 else float("inf")
@@ -94,19 +106,28 @@ def time_range_to_sample_range(
     start: float,
     end: float,
     sample_rate: int,
-    samples: int,
 ) -> tuple[int, int]:
     first = int(start * sample_rate)
     last = int(end * sample_rate)
-    return (
-        min(first, samples - 1),
-        min(last, samples - 1),
-    )
+    return (first, last)
 
 
-def labels_to_scores(
+def map_labels(
     labels_path: str, sample_rate: int, n_samples: int, output_path: str
 ) -> int:
+    """Map labels from the text file to 2d array
+
+    Args:
+        labels_path (str): Labels text file, exported from Audacity
+        sample_rate (int): Audio sample rate
+        n_samples (int): Total number of samples in the audio file
+        output_path (str): The output file for labels. 2d array of bytes ([n_labels, n_samples]), where label can have value 1 or 0.
+
+    Returns:
+        int: The number of label types
+
+    """
+    # Train label list:
     # b - baji
     # r - ru
     # n - baji/ru noise
@@ -117,7 +138,7 @@ def labels_to_scores(
     # y - yelling
     # w - whisper
     label_map: dict[str, list[tuple[float, float]]] = {
-        "p": [],  # peaks
+        "p": [],  # All the train labels (except the noise) are multiplied by the peak label
         "b": [],
         "r": [],
         "n": [],
@@ -137,7 +158,10 @@ def labels_to_scores(
     for label, time_ranges in label_map.items():
         l_samples = np.zeros(n_samples, dtype=np.uint8)
         for f, t in time_ranges:
-            (f_s, t_s) = time_range_to_sample_range(f, t, sample_rate, n_samples)
+            (f_s, t_s) = time_range_to_sample_range(f, t, sample_rate)
+            if f_s >= n_samples:
+                continue
+            t_s = min(t_s, n_samples - 1)
             l_samples[f_s:t_s] = 1
         label_samples[label] = l_samples
 
@@ -161,20 +185,22 @@ def labels_to_scores(
 def convert_dataset(labels_path: str, audio_path: str, output_path: str):
     sample_rate, samples = audio_meta(audio_path)
 
-    if os.path.exists("tmp.scores"):
-        os.remove("tmp.scores")
-    n_scores = labels_to_scores(labels_path, sample_rate, samples, "tmp.scores")
-    smooth("tmp.scores", output_path, samples, n_scores, 256, 1024 * 2, 1000000)
-    os.remove("tmp.scores")
+    if os.path.exists("tmp.labels"):
+        os.remove("tmp.labels")
+    n_scores = map_labels(labels_path, sample_rate, samples, "tmp.labels")
+    labels_to_scores(
+        "tmp.labels", output_path, samples, n_scores, 256, 1024 * 2, 1000000
+    )
+    os.remove("tmp.labels")
 
 
 # Makes raw audio file
-def convert_audio(path: str, target_samples: int | None = None):
-    _sample_rate, audio_data = wav.read(path + ".wav")
+def convert_audio(input_path: str, output_path: str, target_samples: int | None = None):
+    _sample_rate, audio_data = wav.read(input_path)
     if target_samples is None:
         target_samples = len(audio_data)
     file = np.memmap(
-        path + ".audio", dtype=audio_data.dtype, mode="w+", shape=(target_samples,)
+        output_path, dtype=audio_data.dtype, mode="w+", shape=(target_samples,)
     )
     src_samples = audio_data.shape[0]
     if src_samples > target_samples:
@@ -190,8 +216,8 @@ def convert_labeled(base_path: str):
         base_path + ".wav",
         base_path + ".scores",
     )
-    convert_audio("baji_speech")
+    convert_audio(base_path + ".wav", base_path + ".audio")
 
 
 if __name__ == "__main__":
-    convert_labeled("baji_speech")
+    convert_labeled("baji_speech")  # base path to the .waw/.txt files

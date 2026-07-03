@@ -28,26 +28,35 @@ n_classes = model_preset.n_classes
 model = model_preset.model
 model = model.to(device)
 
+
+def make_source(
+    base_path: str,
+) -> tuple[tuple[str, np.dtype | type, float], tuple[str, np.dtype | type]]:
+    """Create audio and scores source configuration
+
+    Args:
+        base_path (str): Base path to the audio/scores dataset files
+
+    Returns:
+        tuple[tuple[str, np.dtype | type, float], tuple[str, np.dtype | type]]: The source configuration
+
+    """
+    return (
+        (
+            base_path + ".audio",
+            np.int16,  # audio should be in 16-bit int format
+            1.0 / 0x7FFF,  # normalizing audio by dividing it by int16.MAX
+        ),
+        (base_path + ".scores", np.float16),  # scores should be in 16-bit float format
+    )
+
+
 # Prepared training files
 train_files = [
-    (
-        (
-            "train.audio",
-            np.int16,
-            1.0 / 0x7FFF,
-        ),
-        ("train.scores", np.byte),
-    ),
+    make_source("train"),
 ]
 eval_files = [
-    (
-        (
-            "eval.audio",
-            np.int16,
-            1.0 / 0x7FFF,
-        ),
-        ("eval.scores", np.byte),
-    )
+    make_source("eval"),
 ]
 
 # Learning rate per epoch, gradually changes from one epoch to another

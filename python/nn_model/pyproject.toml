@@ -8,7 +8,8 @@ requires-python = "==3.12.*"
 dependencies = ["numpy>=2.0", "torch>=2.10", "librosa>=0.11"]
 
 [project.optional-dependencies]
-scipy = ["scipy>=1.14", "onnx>=1.21"]
+scipy = ["scipy>=1.14"]
+onnx = ["onnx>=1.21", "onnxscript>=0.7"]
 
 [tool.ruff.lint]
 select = ["ALL"]
