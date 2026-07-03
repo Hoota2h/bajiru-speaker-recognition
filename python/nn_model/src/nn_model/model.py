@@ -135,6 +135,7 @@ class MelExtractor(nn.Module):
             hop_length (int): Hop length
 
         """
+        super().__init__()
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.n_freq = n_fft // 2 + 1
@@ -161,7 +162,7 @@ class MelExtractor(nn.Module):
             1, forward_basis.shape[0], kernel_size=n_fft, stride=hop_length, bias=False
         )
         stft_conv.weight.data.copy_(forward_basis)
-        stft_conv.weight.requires_grad_(mode=False)
+        stft_conv.weight.requires_grad_(False)  # noqa: FBT003
         self.stft_conv = stft_conv
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -387,6 +388,7 @@ class AudioEncoder(nn.Module):
             dropout (float, optional): The dropout value
 
         """
+        super().__init__()
         self.conv_proj = nn.Conv1d(n_mels, conv_channels, 1)
         self.convs = nn.ModuleList(
             [
