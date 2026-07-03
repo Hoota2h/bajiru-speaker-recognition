@@ -108,11 +108,13 @@ def run_model(
     scores_list,
     seg_batch,
 ):
+    seg_batch = seg_batch.squeeze(0)
     seg_batch = seg_batch.to(device)
-    logits = model(seg_batch)
-    logits = logits.detach()
+    scores = model(seg_batch)
+    scores = scores.detach()
+    scores = scores.unsqueeze(0)
 
-    scores = logits.cpu().numpy()
+    scores = scores.cpu().numpy()
     scores_list.append(scores)
 
 
@@ -152,6 +154,7 @@ win_length = model_preset.win_length
 hop_length = model_preset.hop_length
 model = model_preset.model
 model = model.to(device)
+model.compile()
 
 
 if __name__ == "__main__":
@@ -188,5 +191,6 @@ if __name__ == "__main__":
         audio_mult=audio_mult,
     )
 
+    out_sample_rate = sample_rate // hop_length
     for i in range(model_preset.n_classes):
-        wav.write(args.outputs[i], sample_rate, scores[:, i].repeat(hop_length))
+        wav.write(args.outputs[i], out_sample_rate, scores[:, i])

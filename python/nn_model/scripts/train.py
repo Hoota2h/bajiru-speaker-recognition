@@ -51,7 +51,7 @@ eval_files = [
 ]
 
 # Learning rate per epoch, gradually changes from one epoch to another
-epoch_lr = [(1, 1e-4), (10, 1e-5), (20, 1e-6)]
+epoch_lr = [(1, 1e-3), (10, 1e-4), (40, 1e-5), (200, 1e-6)]
 
 train_batching = {"from": 32, "to": 64, "ep": 10}
 eval_batch_size = 64
@@ -74,8 +74,10 @@ eval_ds = AudioScoreDataset(
 )
 
 
-criterion = nn.SmoothL1Loss(beta=0.05, reduction="mean")
-optimizer = torch.optim.AdamW(model.parameters())
+criterion = nn.BCEWithLogitsLoss()
+optimizer = torch.optim.AdamW(
+    model.parameters(), lr=1e-4, betas=(0.9, 0.98), weight_decay=0.02
+)
 
 
 def train_step(batch):
@@ -85,7 +87,7 @@ def train_step(batch):
     batch_target: torch.Tensor = batch_target.to(device)
 
     optimizer.zero_grad()
-    logits: torch.Tensor = model(batch_audio)
+    _, logits = model.forward_train(batch_audio)
     loss: torch.Tensor = criterion(logits, batch_target)
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -99,7 +101,7 @@ def eval_step(batch):
     with torch.no_grad():
         batch_audio = batch_audio.to(device)
         batch_target = batch_target.to(device)
-        logits = model(batch_audio)
+        _, logits = model.forward_train(batch_audio)
         return criterion(logits, batch_target).detach().item()
 
 

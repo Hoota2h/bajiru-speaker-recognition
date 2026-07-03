@@ -18,6 +18,11 @@ uv run -s ./python/nn_model/scripts/eval.py -c checkpoints/best_***.pt -i input_
 uv run -s ./python/nn_model/scripts/makedata.py
 ```
 
+[Onnx export example](scripts/export_onnx.py)
+```py
+uv run -s ./python/nn_model/scripts/export_onnx.py
+```
+
 The [train dataset](src/nn_model/dataset.py) accepts a list of raw audio and target scores files.
 The files contain raw binary numbers, the number format should be specified for each file.
 - audio file - has additional multiplier property, that can be used to normalize the audio to range `[-1.0:1.0]`. For example for int16 format the audio multiplier should be `1.0 / 0x7FFF`.
